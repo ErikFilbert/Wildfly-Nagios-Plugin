@@ -78,3 +78,6 @@ try:
 except socket.error as (errno, strerror):
     print "I/O error({0}): {1}".format(errno, strerror)+'. Wildfly Down? | '+key+'=0;'+str(w)+';'+str(c)
     sys.exit(0)
+except ValueError:
+    print "UNKNOWN - Could not read JSON, status: "+str(resp.status)+" body: "+body
+    sys.exit(3)
