@@ -60,7 +60,7 @@ try:
     body = resp.read()
     dbody = json.loads(body)
 
-    res = flatten(dbody)[key]
+    res = int(flatten(dbody)[key])
 
     if w and c:
         if res > c:
