@@ -1,6 +1,6 @@
 Usage: check_wildfly_api.py [options]
 
-This Nagios plugin checks the health of Wildfly.
+This Nagios plugin checks the health of Wildfly / Jboss AS via HTTP(s).
 
 ```
 Options:
@@ -17,4 +17,9 @@ Options:
   -A PATH, --path=PATH  Path, e.g. /management/core-service/platform-
                         mbean/type/threading
   -k KEY, --key=KEY     Key, e.g. thread-count
+```
+
+Example:
+```
+./check_wildfly_api.py -P 9993 -u 'user' -p 'someSecretPassword' -A /management/core-service/platform-mbean/type/threading -k thread-count -C 4000 -W 2500
 ```
