@@ -27,6 +27,7 @@ import pprint
 import collections
 import optparse
 import socket
+import re
 
 parameters = '?operation=resource&include-runtime=true&recursive'
 
@@ -40,6 +41,7 @@ p.add_option('-W', '--warning', action='store', type='int', dest='warning', defa
 p.add_option('-C', '--critical', action='store', type='int', dest='critical', default=None, help='The critical threshold we want to set')
 p.add_option('-A', '--path', action='store', type='string', dest='path', default='/management', help='Path, e.g. /management/core-service/platform-mbean/type/threading')
 p.add_option('-k', '--key', action='store', type='string', dest='key', default=None, help='Key, e.g. thread-count')
+p.add_option('-s', '--string', action='store', type='string', dest='matchString', default=None, help='Output should match to string')
 
 options, arguments = p.parse_args()
 url = options.host+':'+str(options.port)
@@ -49,6 +51,7 @@ path = options.path
 key = options.key
 w = options.warning
 c = options.critical
+matchString = options.matchString
 
 def flatten(d, parent_key='', sep='/'):
     items = []
@@ -76,26 +79,45 @@ try:
 
     resp = conn.getresponse()
     body = resp.read()
-    dbody = json.loads(body)
+    if resp.status == 200:
+        dbody = json.loads(body)
 
-    res = int(flatten(dbody)[key])
+        if matchString:
+            rx = re.compile(key)
+            for k,v in flatten(dbody).iteritems():
+                if rx.match(k):
+                    key = k
+                    res = str(v)
+        else:
+            res = int(flatten(dbody)[key])
+    else:
+	    print('UNKNOWN - %s/%s: Response not 200: Status: %i, Body: %s' % (path,key,resp.status,body))
+	    sys.exit(3)
 
     if w and c:
         if res > c:
-            print 'CRITICAL - '+path+'/'+key+': '+str(res)+' | '+key+'='+str(res)+';'+str(w)+';'+str(c)
+            print ('CRITICAL - %s/%s: %i | %s=%i;%i;%i' % (path,key,res,key,res,w,c))
             sys.exit(2)
         elif res > w:
-            print 'WARNING - '+path+'/'+key+': '+str(res)+' | '+key+'='+str(res)+';'+str(w)+';'+str(c)
+            print ('WARNING - %s/%s: %i | %s=%i;%i;%i' % (path,key,res,key,res,w,c))
             sys.exit(1)
         else:
-            print 'OKAY - '+path+'/'+key+': '+str(res)+' | '+key+'='+str(res)+';'+str(w)+';'+str(c)
+            print ('OKAY - %s/%s: %i | %s=%i;%i;%i' % (path,key,res,key,res,w,c))
             sys.exit(0)
+    elif matchString:
+        if res == matchString:
+            print ('OKAY - %s/%s: %s | %s=1' % (path,key,res,key))
+            sys.exit(0)
+        else:
+            print ('CRITICAL - %s/%s: %s | %s=1' % (path,key,res,key))
+            sys.exit(1)
     else:
-        print 'OKAY - '+path+'/'+key+': '+str(res)
+        print ('OKAY - '+path+'/'+key+': '+str(res))
         sys.exit(0)
+    
 except socket.error as (errno, strerror):
-    print "I/O error({0}): {1}".format(errno, strerror)+'. Wildfly Down? | '+key+'=0;'+str(w)+';'+str(c)
+    print ('I/O error(%s): %s . Wildfly Down? | %s=0;%s;%s' % (errno,strerror,key,str(w),str(c)))
     sys.exit(0)
-except ValueError:
-    print "UNKNOWN - Could not read JSON, status: "+str(resp.status)+" body: "+body
+except ValueError as (ex):
+    print ('UNKNOWN - Could not read JSON, status: %i body: %s\nCause: %s' % (resp.status,body,ex))
     sys.exit(3)
